@@ -4,3 +4,5 @@ export { default as StarRating } from "./StarRating";
 export { default as BestForTag } from "./BestForTag";
 export { default as Toast } from "./Toast";
 export { default as ImagePlaceholder } from "./ImagePlaceholder";
+export { default as Tooltip } from "./Tooltip";
+export { default as DigitronLoader } from "./DigitronLoader";

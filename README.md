@@ -1,16 +1,106 @@
-# React + Vite
+# Digitron Associates
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React/Vite storefront with an Express backend, MongoDB through Prisma, admin login, and Google customer login.
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 20+
+- MongoDB, either local or MongoDB Atlas
+- Google OAuth credentials if customer Google login should work
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Install frontend packages:
 
-## Expanding the ESLint configuration
+```bash
+npm install
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Install backend packages:
+
+```bash
+cd backend
+npm install
+```
+
+Create `backend/.env` from `backend/.env.example`, then set:
+
+```env
+MONGODB_URI=mongodb://localhost:27017/digitron?serverSelectionTimeoutMS=5000
+JWT_SECRET=change-this-admin-jwt-secret
+SESSION_SECRET=change-this-session-secret
+FRONTEND_URL=http://localhost:5173
+PORT=5000
+```
+
+For MongoDB Atlas, use a URI with a database name, for example:
+
+```env
+MONGODB_URI=mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/digitron?retryWrites=true&w=majority&serverSelectionTimeoutMS=5000
+```
+
+In Atlas, also allow your current IP address in Network Access. Without that, the backend will start but `/api/health` and product/category APIs will time out or return database errors.
+
+Generate the Prisma MongoDB client:
+
+```bash
+cd backend
+npm run prisma:generate
+```
+
+If your MongoDB database is empty and you have the exported Supabase data in `backend/migrate/data/supabase-export.json`, import it:
+
+```bash
+cd backend
+npm run migrate:mongo:import
+```
+
+## Run
+
+Start the backend:
+
+```bash
+cd backend
+npm start
+```
+
+Check the backend:
+
+```bash
+http://localhost:5000/api/health
+```
+
+Start the frontend in another terminal:
+
+```bash
+npm run dev
+```
+
+Open:
+
+```bash
+http://localhost:5173
+```
+
+Admin login:
+
+```text
+username: admin
+password: Admin@1234
+```
+
+## Google Login
+
+Create OAuth credentials in Google Cloud Console and add this redirect URI:
+
+```text
+http://localhost:5000/api/auth/google/callback
+```
+
+Then set these in `backend/.env`:
+
+```env
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
+```

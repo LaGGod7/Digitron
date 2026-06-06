@@ -4,7 +4,7 @@ import { Footer } from "../components/layout";
 import bundles from "../data/bundles";
 import siteConfig from "../data/siteConfig";
 
-export default function PackagesPage({ showToast }) {
+export default function PackagesPage() {
   const [expanded, setExpanded] = useState(null);
 
   return (

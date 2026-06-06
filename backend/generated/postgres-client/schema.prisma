@@ -1,0 +1,61 @@
+generator postgresClient {
+  provider = "prisma-client-js"
+  output   = "../generated/postgres-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String
+  slug     String    @unique
+  products Product[]
+}
+
+model Product {
+  id            Int      @id @default(autoincrement())
+  name          String
+  brand         String
+  categoryId    String
+  category      Category @relation(fields: [categoryId], references: [id])
+  price         Float
+  stockStatus   String
+  stockQty      Int      @default(0)
+  barcode       String?
+  gst           String?
+  indoorOutdoor String?
+  resolution    String?
+  type          String?
+  specs         Json?
+  images        String[]
+  bestFor       String[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  reviews       Review[]
+}
+
+model Review {
+  id           String   @id @default(uuid())
+  productId    Int
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  reviewerName String
+  rating       Int
+  reviewText   String
+  isVerified   Boolean  @default(false)
+  isApproved   Boolean  @default(false)
+  helpfulYes   Int      @default(0)
+  helpfulNo    Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model QuoteRequest {
+  id            String   @id @default(uuid())
+  customerName  String
+  customerPhone String
+  status        String   @default("Pending")
+  items         Json
+  createdAt     DateTime @default(now())
+}

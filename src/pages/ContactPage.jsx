@@ -1,13 +1,23 @@
 import { useState } from "react";
 import { Icon } from "../components/ui";
 import { Footer } from "../components/layout";
+import { useMutation } from '@tanstack/react-query';
+import { submitQuoteRequest } from '../services/api';
 import products from "../data/products";
 import siteConfig from "../data/siteConfig";
 
 export default function ContactPage({ showToast }) {
   const [form, setForm] = useState({ name: "", phone: "", email: "", product: "", message: "" });
   const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: (data) => submitQuoteRequest(data),
+    onSuccess: () => {
+      setForm({ name: "", phone: "", email: "", product: "", message: "" });
+      showToast("Enquiry sent! We'll contact you shortly.");
+    },
+    onError: () => showToast("Failed to send enquiry. Please try again.")
+  });
 
   const validate = () => {
     const e = {};
@@ -21,12 +31,12 @@ export default function ContactPage({ showToast }) {
     const errs = validate();
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setForm({ name: "", phone: "", email: "", product: "", message: "" });
-      showToast("Enquiry sent! We'll contact you shortly.");
-    }, 800);
+    
+    mutation.mutate({
+      customerName: form.name,
+      customerPhone: form.phone,
+      items: [{ name: form.product || "General Enquiry", message: form.message, customerEmail: form.email }]
+    });
   };
 
   return (
@@ -72,8 +82,8 @@ export default function ContactPage({ showToast }) {
               <textarea className="form-textarea" rows={5} placeholder="Describe your security requirements, premises size, number of cameras needed, etc." value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
               {errors.message && <span style={{ fontSize: 11, color: "#791F1F" }}>{errors.message}</span>}
             </div>
-            <button className="btn-submit-review" style={{ padding: "12px 32px", fontSize: 14 }} onClick={submit} disabled={loading}>
-              {loading ? "Sending..." : "Send Enquiry"}
+            <button className="btn-submit-review" style={{ padding: "12px 32px", fontSize: 14 }} onClick={submit} disabled={mutation.isPending}>
+              {mutation.isPending ? "Sending..." : "Send Enquiry"}
             </button>
           </div>
 

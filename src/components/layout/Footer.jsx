@@ -1,9 +1,6 @@
-import { useNavigate } from "react-router-dom";
 import siteConfig from "../../data/siteConfig";
 
 export default function Footer() {
-  const navigate = useNavigate();
-
   return (
     <footer className="footer">
       <div className="footer-inner">

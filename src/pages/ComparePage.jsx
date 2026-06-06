@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Icon, WhatsAppIcon } from "../components/ui";
+import { Icon, WhatsAppIcon, Tooltip } from "../components/ui";
 import { Footer } from "../components/layout";
 import siteConfig from "../data/siteConfig";
 
@@ -8,12 +8,18 @@ const SPEC_ROWS = ["Price", "Resolution", "Type", "Indoor/Outdoor", "Night Visio
 function getSpecValue(product, field) {
   if (!product) return null;
   const map = {
-    Price: `₹${product.price.toLocaleString("en-IN")}`,
+    Price: product.price > 0 ? `Rs. ${product.price.toLocaleString("en-IN")}` : "Price on request",
     Resolution: product.resolution,
     Type: product.type,
     "Indoor/Outdoor": product.indoor_outdoor,
     "Night Vision": product.specs?.NightVision || "—",
-    Weatherproof: product.specs?.Weatherproof || "—",
+    Weatherproof: product.specs?.Weatherproof ? (
+      <Tooltip content="Waterproof rating – survives rain & dust">
+        <span style={{ cursor: 'help', borderBottom: '1px dotted var(--mid-gray)' }}>
+          {product.specs.Weatherproof}
+        </span>
+      </Tooltip>
+    ) : "—",
     Warranty: product.specs?.Warranty || "—",
     "Avg Rating": `${product.avg_rating} ★ (${product.review_count})`,
     "Best For": product.best_for.join(", "),
