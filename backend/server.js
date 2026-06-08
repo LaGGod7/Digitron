@@ -24,7 +24,14 @@ if (process.env.DATABASE_URL) {
 
 
 const app = express();
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.MONGODB_URI
+    }
+  },
+  log: ['error']
+});
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 const OBJECT_ID_RE = /^[a-f\d]{24}$/i;
