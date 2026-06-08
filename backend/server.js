@@ -161,6 +161,7 @@ if (isVercel) {
   });
 }
 
+// Memory caches (instantly loaded with local files as defaults)
 let productVisits = {};
 try {
   if (fs.existsSync(VISITS_FILE)) {
@@ -170,14 +171,6 @@ try {
   console.error('Error loading visits file:', err);
 }
 
-const saveVisits = () => {
-  try {
-    fs.writeFileSync(VISITS_FILE, JSON.stringify(productVisits), 'utf8');
-  } catch (err) {
-    console.error('Error saving visits file:', err);
-  }
-};
-
 let hiddenProductIds = [];
 try {
   if (fs.existsSync(HIDDEN_FILE)) {
@@ -186,14 +179,6 @@ try {
 } catch (err) {
   console.error('Error loading hidden products:', err);
 }
-
-const saveHidden = () => {
-  try {
-    fs.writeFileSync(HIDDEN_FILE, JSON.stringify(hiddenProductIds), 'utf8');
-  } catch (err) {
-    console.error('Error saving hidden products:', err);
-  }
-};
 
 const defaultSettings = {
   storeName: "Digitron Associates",
@@ -244,12 +229,95 @@ const loadSettings = () => {
 
 let siteSettings = loadSettings();
 
+// --- MongoDB MongoClient integration for permanent persistence ---
+const { MongoClient } = require('mongodb');
+let dbClient = null;
+let db = null;
+
+async function getDb() {
+  if (db) return db;
+  if (!process.env.MONGODB_URI) return null;
+  try {
+    dbClient = new MongoClient(process.env.MONGODB_URI);
+    await dbClient.connect();
+    db = dbClient.db();
+    return db;
+  } catch (err) {
+    console.error("MongoClient connection error:", err);
+    return null;
+  }
+}
+
+async function persistLoad(key, defaultValue) {
+  const database = await getDb();
+  if (!database) return defaultValue;
+  try {
+    const col = database.collection('key_value_store');
+    const doc = await col.findOne({ key });
+    return doc ? doc.value : defaultValue;
+  } catch (err) {
+    console.error(`Error loading key ${key} from MongoDB:`, err);
+    return defaultValue;
+  }
+}
+
+async function persistSave(key, value) {
+  const database = await getDb();
+  if (!database) return;
+  try {
+    const col = database.collection('key_value_store');
+    await col.updateOne({ key }, { $set: { value } }, { upsert: true });
+  } catch (err) {
+    console.error(`Error saving key ${key} to MongoDB:`, err);
+  }
+}
+
+// Asynchronously load from MongoDB once connection is established
+async function initializePersistence() {
+  try {
+    const dbVisits = await persistLoad('product_visits', null);
+    if (dbVisits) productVisits = dbVisits;
+
+    const dbHidden = await persistLoad('hidden_products', null);
+    if (dbHidden) hiddenProductIds = dbHidden;
+
+    const dbSettings = await persistLoad('site_settings', null);
+    if (dbSettings) siteSettings = mergeSettings(dbSettings);
+
+    console.log('MongoDB settings persistence initialized successfully');
+  } catch (err) {
+    console.error('Failed to initialize MongoDB persistence:', err);
+  }
+}
+
+// Run initialization in the background
+initializePersistence();
+
+const saveVisits = () => {
+  try {
+    fs.writeFileSync(VISITS_FILE, JSON.stringify(productVisits), 'utf8');
+  } catch (err) {
+    console.error('Error saving visits file locally:', err);
+  }
+  persistSave('product_visits', productVisits);
+};
+
+const saveHidden = () => {
+  try {
+    fs.writeFileSync(HIDDEN_FILE, JSON.stringify(hiddenProductIds), 'utf8');
+  } catch (err) {
+    console.error('Error saving hidden products locally:', err);
+  }
+  persistSave('hidden_products', hiddenProductIds);
+};
+
 const saveSettings = () => {
   try {
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(siteSettings, null, 2), 'utf8');
   } catch (err) {
-    console.error('Error saving site settings:', err);
+    console.error('Error saving site settings locally:', err);
   }
+  persistSave('site_settings', siteSettings);
 };
 
 const isMongoId = (value) => typeof value === 'string' && OBJECT_ID_RE.test(value);
@@ -786,6 +854,7 @@ app.delete('/api/admin/settings', authenticateAdmin, async (req, res) => {
   try {
     siteSettings = mergeSettings();
     if (fs.existsSync(SETTINGS_FILE)) fs.unlinkSync(SETTINGS_FILE);
+    saveSettings();
     res.json({ success: true, settings: siteSettings });
   } catch (error) {
     console.error('Error resetting site settings:', error);
