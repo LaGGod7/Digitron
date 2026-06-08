@@ -351,6 +351,39 @@ app.get('/api/auth/me', (req, res) => {
   res.json({ user: req.user ? customerProfilePayload(req.user) : null });
 });
 
+app.get('/api/db-debug', async (req, res) => {
+  const dns = require('dns');
+  const debugInfo = {
+    hasUri: Boolean(process.env.MONGODB_URI),
+    uriLength: process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 0,
+    uriStart: process.env.MONGODB_URI ? process.env.MONGODB_URI.substring(0, 25) + '...' : 'none',
+    uriEnd: process.env.MONGODB_URI ? '...' + process.env.MONGODB_URI.substring(process.env.MONGODB_URI.length - 25) : 'none',
+    dnsResolution: {},
+    dnsError: null
+  };
+
+  try {
+    const hosts = [
+      'ac-fw06elh-shard-00-00.osj0ebt.mongodb.net',
+      'digitron.osj0ebt.mongodb.net'
+    ];
+    for (const host of hosts) {
+      try {
+        const addresses = await new Promise((resolve, reject) => {
+          dns.resolve4(host, (err, addrs) => err ? reject(err) : resolve(addrs));
+        });
+        debugInfo.dnsResolution[host] = addresses;
+      } catch (e) {
+        debugInfo.dnsResolution[host] = `Error: ${e.message}`;
+      }
+    }
+  } catch (err) {
+    debugInfo.dnsError = err.message;
+  }
+
+  res.json(debugInfo);
+});
+
 app.get('/api/health', async (req, res) => {
   try {
     await withTimeout(
