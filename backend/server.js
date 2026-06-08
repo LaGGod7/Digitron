@@ -31,7 +31,7 @@ const OBJECT_ID_RE = /^[a-f\d]{24}$/i;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const SESSION_MONGO_URL = process.env.MONGODB_URI || process.env.DATABASE_URL;
 const GOOGLE_AUTH_CONFIGURED = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
-const USE_MONGO_SESSION_STORE = process.env.SESSION_STORE === 'mongo';
+const USE_MONGO_SESSION_STORE = process.env.SESSION_STORE === 'mongo' && !(process.env.VERCEL || process.env.NOW_BUILDER);
 const logRouteError = (label, error) => {
   console.error(`${label}:`, error?.message || error);
 };
