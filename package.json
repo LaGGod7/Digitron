@@ -3,18 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-"homepage": "https://gd7.github.io/digitron",
-
+  "homepage": "https://gd7.github.io/digitron",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "vite",
+    "dev:backend": "node backend/server.js",
     "build": "prisma generate --schema=backend/prisma/schema.prisma && vite build",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "lint": "eslint .",
     "preview": "vite preview"
   },
-
-
   "dependencies": {
     "@floating-ui/react": "^0.27.19",
     "@prisma/client": "^5.22.0",
@@ -40,6 +39,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^10.0.3",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
