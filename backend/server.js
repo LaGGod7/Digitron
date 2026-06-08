@@ -9,6 +9,15 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 require('dotenv').config();
 
+// Sanitize connection strings to remove any accidental wrapping quotes or spaces from Vercel dashboard
+if (process.env.MONGODB_URI) {
+  process.env.MONGODB_URI = process.env.MONGODB_URI.trim().replace(/^["']|["']$/g, '');
+}
+if (process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.DATABASE_URL.trim().replace(/^["']|["']$/g, '');
+}
+
+
 const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
