@@ -12,7 +12,7 @@ const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 
 // Sanitize connection strings to remove any accidental wrapping quotes or spaces from Vercel dashboard
 if (process.env.MONGODB_URI) {
