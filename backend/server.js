@@ -369,7 +369,7 @@ const mapReview = (r) => ({
 });
 
 // Helper to map DB product to Frontend expected format
-const mapProduct = (p) => {
+const mapProduct = (p, hiddenIds = hiddenProductIds) => {
   const reviewsMapped = p.reviews ? p.reviews.map(mapReview) : [];
   const avg_rating = reviewsMapped.length > 0
     ? parseFloat((reviewsMapped.reduce((sum, r) => sum + r.rating, 0) / reviewsMapped.length).toFixed(1))
@@ -385,7 +385,7 @@ const mapProduct = (p) => {
     reviews: reviewsMapped,
     avg_rating,
     review_count: reviewsMapped.length,
-    is_visible: !hiddenProductIds.includes(p.id)
+    is_visible: !hiddenIds.includes(p.id)
   };
 };
 
@@ -623,7 +623,12 @@ app.get('/api/customer/reviews', requireCustomer, async (req, res) => {
 
 // --- Public Routes ---
 app.get('/api/settings', async (req, res) => {
-  res.json(siteSettings);
+  try {
+    const settings = mergeSettings(await persistLoad('site_settings', defaultSettings));
+    res.json(settings);
+  } catch (error) {
+    res.json(siteSettings);
+  }
 });
 
 app.get('/api/categories', async (req, res) => {
@@ -639,12 +644,17 @@ app.get('/api/categories', async (req, res) => {
 app.get('/api/products', async (req, res) => {
   try {
     const { category, search, limit = 50, offset = 0, admin, includeReviews } = req.query;
+    
+    // Fetch latest hidden list and visits dynamically
+    const hiddenIds = await persistLoad('hidden_products', []);
+    const visits = await persistLoad('product_visits', {});
+
     const where = {};
     const andFilters = [];
     
-    if (!admin && hiddenProductIds.length > 0) {
-      const hiddenMongoIds = hiddenProductIds.filter(isMongoId);
-      const hiddenLegacyIds = hiddenProductIds.map(numericId).filter(id => id !== null);
+    if (!admin && hiddenIds.length > 0) {
+      const hiddenMongoIds = hiddenIds.filter(isMongoId);
+      const hiddenLegacyIds = hiddenIds.map(numericId).filter(id => id !== null);
       if (hiddenMongoIds.length) andFilters.push({ id: { notIn: hiddenMongoIds } });
       if (hiddenLegacyIds.length) andFilters.push({ legacyId: { notIn: hiddenLegacyIds } });
     }
@@ -677,12 +687,12 @@ app.get('/api/products', async (req, res) => {
     // Track searches
     if (search && products.length > 0) {
       products.forEach(p => {
-        productVisits[p.id] = (productVisits[p.id] || 0) + 1;
+        visits[p.id] = (visits[p.id] || 0) + 1;
       });
-      saveVisits();
+      persistSave('product_visits', visits);
     }
 
-    res.json({ products: products.map(mapProduct), total });
+    res.json({ products: products.map(p => mapProduct(p, hiddenIds)), total });
   } catch (error) {
     logRouteError('Error fetching products', error);
     res.status(500).json({ error: 'Error fetching products' });
@@ -691,7 +701,10 @@ app.get('/api/products', async (req, res) => {
 
 app.get('/api/products/popular', async (req, res) => {
   try {
-    const sortedKeys = Object.entries(productVisits)
+    const visits = await persistLoad('product_visits', {});
+    const hiddenIds = await persistLoad('hidden_products', []);
+
+    const sortedKeys = Object.entries(visits)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(entry => entry[0]);
@@ -710,8 +723,8 @@ app.get('/api/products/popular', async (req, res) => {
         include: { category: true, reviews: { where: { isApproved: true } } }
       });
       products.sort((a, b) => {
-        const aKey = productVisits[a.id] ? a.id : String(a.legacyId);
-        const bKey = productVisits[b.id] ? b.id : String(b.legacyId);
+        const aKey = visits[a.id] ? a.id : String(a.legacyId);
+        const bKey = visits[b.id] ? b.id : String(b.legacyId);
         return sortedKeys.indexOf(aKey) - sortedKeys.indexOf(bKey);
       });
     } else {
@@ -723,8 +736,8 @@ app.get('/api/products/popular', async (req, res) => {
     }
     
     res.json(products.map(p => ({
-      ...mapProduct(p),
-      visits: productVisits[p.id] || productVisits[p.legacyId] || 0
+      ...mapProduct(p, hiddenIds),
+      visits: visits[p.id] || visits[p.legacyId] || 0
     })));
   } catch (error) {
     console.error('Popular products error:', error);
@@ -738,10 +751,12 @@ app.get('/api/products/:id', async (req, res) => {
     if (!product) return res.status(404).json({ error: 'Not found' });
 
     // Track visit
-    productVisits[product.id] = (productVisits[product.id] || 0) + 1;
-    saveVisits();
+    const visits = await persistLoad('product_visits', {});
+    const hiddenIds = await persistLoad('hidden_products', []);
+    visits[product.id] = (visits[product.id] || 0) + 1;
+    persistSave('product_visits', visits);
 
-    res.json(mapProduct(product));
+    res.json(mapProduct(product, hiddenIds));
   } catch (error) {
     logRouteError('Error fetching product', error);
     res.status(500).json({ error: 'Error fetching product' });
@@ -965,16 +980,23 @@ app.post('/api/admin/products/:id/toggle-visibility', authenticateAdmin, async (
     const product = await findProductByIdentifier(req.params.id);
     if (!product) return res.status(404).json({ error: 'Product not found' });
     const pid = product.id;
-    const index = hiddenProductIds.indexOf(pid);
+    
+    // Fetch latest list from MongoDB dynamically
+    const hiddenIds = await persistLoad('hidden_products', []);
+    const index = hiddenIds.indexOf(pid);
     if (index > -1) {
       // Make visible again
-      hiddenProductIds.splice(index, 1);
+      hiddenIds.splice(index, 1);
     } else {
       // Hide product
-      hiddenProductIds.push(pid);
+      hiddenIds.push(pid);
     }
-    saveHidden();
-    res.json({ success: true, is_visible: !hiddenProductIds.includes(pid) });
+    
+    // Save back to MongoDB and local cache
+    await persistSave('hidden_products', hiddenIds);
+    hiddenProductIds = hiddenIds;
+    
+    res.json({ success: true, is_visible: !hiddenIds.includes(pid) });
   } catch (error) {
     console.error('Error toggling product visibility:', error);
     res.status(500).json({ error: 'Error toggling product visibility' });
